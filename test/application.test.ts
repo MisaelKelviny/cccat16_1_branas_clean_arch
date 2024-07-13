@@ -1,9 +1,18 @@
-import axios from "axios";
 import crypto from "crypto";
+import { GetAccount } from "../src/application/GetAccount";
+import { Signup } from "../src/application/Signup";
+import { AccountDAOMemory } from "../src/resources/AccountDAO";
+import { MailerGatewayMemory } from "../src/resources/MailerGateway";
 
-axios.defaults.validateStatus = function () {
-  return true;
-};
+let signup: Signup;
+let getAccount: GetAccount;
+
+beforeEach(() => {
+  const accountDAO = new AccountDAOMemory();
+  const mailerGateway = new MailerGatewayMemory();
+  signup = new Signup(accountDAO, mailerGateway);
+  getAccount = new GetAccount(accountDAO);
+});
 
 test("Deve criar uma conta para o passageiro", async function () {
   const input = {
@@ -13,16 +22,14 @@ test("Deve criar uma conta para o passageiro", async function () {
     cpf: "87748248800",
     isPassenger: true,
   };
-  const output = await axios.post("http://localhost:3000/signup", input);
-  expect(output.status).toBe(200);
-  expect(output.data.accountId).toBeDefined();
 
-  const outputGetAccount = await axios.get(
-    `http://localhost:3000/accounts/${output.data.accountId}`
-  );
-  expect(outputGetAccount.data.name).toBe(input.name);
-  expect(outputGetAccount.data.email).toBe(input.email);
-  expect(outputGetAccount.data.cpf).toBe(input.cpf);
+  const output = await signup.execute(input);
+  expect(output.accountId).toBeDefined();
+
+  const outputGetAccount = await getAccount.execute(output);
+  expect(outputGetAccount.name).toBe(input.name);
+  expect(outputGetAccount.email).toBe(input.email);
+  expect(outputGetAccount.cpf).toBe(input.cpf);
 });
 
 test("Deve criar uma conta para o driver", async function () {
@@ -35,17 +42,14 @@ test("Deve criar uma conta para o driver", async function () {
     isPassenger: false,
     isDriver: true,
   };
-  const output = await axios.post("http://localhost:3000/signup", input);
-  expect(output.status).toBe(200);
-  expect(output.data.accountId).toBeDefined();
+  const output = await signup.execute(input);
+  expect(output.accountId).toBeDefined();
 
-  const outputGetAccount = await axios.get(
-    `http://localhost:3000/accounts/${output.data.accountId}`
-  );
-  expect(outputGetAccount.data.name).toBe(input.name);
-  expect(outputGetAccount.data.email).toBe(input.email);
-  expect(outputGetAccount.data.cpf).toBe(input.cpf);
-  expect(outputGetAccount.data.car_plate).toBe(input.carPlate);
+  const outputGetAccount = await getAccount.execute(output);
+  expect(outputGetAccount.name).toBe(input.name);
+  expect(outputGetAccount.email).toBe(input.email);
+  expect(outputGetAccount.cpf).toBe(input.cpf);
+  expect(outputGetAccount.carPlate).toBe(input.carPlate);
 });
 
 test("Não deve criar se o passageiro tiver o nome inválido", async function () {
@@ -57,9 +61,10 @@ test("Não deve criar se o passageiro tiver o nome inválido", async function ()
     carPlate: "AAA0000",
     isPassenger: true,
   };
-  const output = await axios.post("http://localhost:3000/signup", input);
-  expect(output.status).toBe(422);
-  expect(output.data.message).toBe("Invalid name");
+
+  await expect(() => signup.execute(input)).rejects.toThrow(
+    new Error("Invalid name")
+  );
 });
 
 test("Não deve criar se o passageiro tiver o email inválido", async function () {
@@ -71,9 +76,9 @@ test("Não deve criar se o passageiro tiver o email inválido", async function (
     carPlate: "AAA0000",
     isPassenger: true,
   };
-  const output = await axios.post("http://localhost:3000/signup", input);
-  expect(output.status).toBe(422);
-  expect(output.data.message).toBe("Invalid email");
+  await expect(() => signup.execute(input)).rejects.toThrow(
+    new Error("Invalid email")
+  );
 });
 
 test("Não deve criar se o passageiro tiver o cpf inválido", async function () {
@@ -85,9 +90,9 @@ test("Não deve criar se o passageiro tiver o cpf inválido", async function () 
     carPlate: "AAA0000",
     isPassenger: true,
   };
-  const output = await axios.post("http://localhost:3000/signup", input);
-  expect(output.status).toBe(422);
-  expect(output.data.message).toBe("Invalid CPF");
+  await expect(() => signup.execute(input)).rejects.toThrow(
+    new Error("Invalid CPF")
+  );
 });
 
 test("Não deve criar se o passageiro tiver placa do carro inválido", async function () {
@@ -99,7 +104,7 @@ test("Não deve criar se o passageiro tiver placa do carro inválido", async fun
     carPlate: "aa222222ss",
     isDriver: true,
   };
-  const output = await axios.post("http://localhost:3000/signup", input);
-  expect(output.status).toBe(422);
-  expect(output.data.message).toBe("Invalid car plate");
+  await expect(() => signup.execute(input)).rejects.toThrow(
+    new Error("Invalid car plate")
+  );
 });
